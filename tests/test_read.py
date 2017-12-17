@@ -66,7 +66,6 @@ def test_mnemonic_duplicate():
     assert [c.mnemonic for c in l.curves] == [
         "DEPT", "DT", "RHOB", "NPHI", "SFLU:1", "SFLU:2", "ILM", "ILD"]
 
-
 def test_mnemonic_leading_period():
     l = lasio.read(egfn("mnemonic_leading_period.las"))
     assert [c.mnemonic for c in l.curves] == [
@@ -85,7 +84,6 @@ def test_mnemonic_missing_multiple():
 def test_multi_curve_mnemonics():
     l = lasio.read(egfn('sample_issue105_a.las'))
     assert l.keys() == [c.mnemonic for c in l.curves] == ['DEPT', 'RHO:1', 'RHO:2', 'RHO:3', 'PHI']
-
 
 def test_multi_missing_curve_mnemonics():
     l = lasio.read(egfn('sample_issue105_b.las'))
@@ -194,3 +192,36 @@ def test_UWI_API_leading_zero():
 def test_sparse_curves():
     las = lasio.read(egfn('sparse_curves.las'))
     assert las.curves.keys() == ['DEPT', 'DT', 'RHOB', 'NPHI', 'SFLU', 'SFLA', 'ILM', 'ILD']
+
+def test_colon_start_unit():
+    las = lasio.read(egfn('colon_pick_start.las'))
+    assert las.params.TCS.unit == 'hh:mm'
+
+def test_colon_start_value_1():
+    las = lasio.read(egfn('colon_pick_start.las'))
+    assert las.params.TCS.value == '21:30 23-JAN-2001'
+
+def test_colon_start_value_2():
+    las = lasio.read(egfn('colon_pick_start.las'))
+    assert las.params.TIML.value == '23:15 23-JAN-2001'
+
+def test_colon_start_value():
+    las = lasio.read(egfn('colon_pick_start.las'))
+    assert las.params.TIML.descr == 'Time Logger: At Bottom'
+    
+def test_colon_end_unit():
+    las = lasio.read(egfn('colon_pick_end.las'))
+    assert las.params.TCS.unit == 'hh:mm'
+
+def test_colon_end_value_1():
+    las = lasio.read(egfn('colon_pick_end.las'))
+    assert las.params.TCS.value == '21:30 23-JAN-2001'
+
+def test_colon_end_value_2():
+    las = lasio.read(egfn('colon_pick_end.las'))
+    assert las.params.TIML.value == '23:15 23-JAN-2001'
+
+def test_colon_end_value():
+    las = lasio.read(egfn('colon_pick_end.las'))
+    assert las.params.TIML.descr == 'Time Logger: At Bottom'
+    

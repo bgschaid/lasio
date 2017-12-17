@@ -98,6 +98,7 @@ class LASFile(object):
         arguments which help to manage issues relate to character encodings.
 
         '''
+        logger.debug('LASFile.read({})'.format(file_ref))
 
         file_obj, self.encoding = reader.open_file(file_ref, **kwargs)
 
@@ -236,6 +237,8 @@ class LASFile(object):
         for mnemonic in ('STRT', 'STOP', 'STEP'):
             if mnemonic in self.well:
                 check_units_on.append(self.well[mnemonic])
+                unit = self.well[mnemonic].unit
+                logger.debug('STRT unit {} type {}'.format(unit, type(unit)))
         if len(self.curves) > 0:
             check_units_on.append(self.curves[0])
         for index_unit, possibilities in defaults.DEPTH_UNITS.items():

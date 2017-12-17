@@ -441,13 +441,31 @@ def parse_header_section(sectdict, version, ignore_header_errors=False):
     assert len(sectdict["lines"]) == len(sectdict["line_nos"])
     parser = SectionParser(title, version=version)
     section = SectionItems()
+    cposarr = []
+
+    # First, scan for colon/period positions.
+    colons = []
+    for i in range(len(sectdict["lines"])):
+        line = sectdict["lines"][i]
+        j = sectdict["line_nos"][i]
+        if not line:
+            continue
+        for pos in [pos for pos, char in enumerate(line) if char == ':']:
+            colons.append((j, pos))
+    colon_positions = {pos: 0 for j, pos in colons}
+    for j, pos in colons:
+        colon_positions[pos] += 1
+    colon_pos_ranks = sorted(colon_positions.keys(), key=lambda k: colon_positions[k])[::-1] # sort by rank
+    logger.debug('Section {} colon positions (ranked): {}'.format(title, colon_pos_ranks))
+
+    # Now parse.
     for i in range(len(sectdict["lines"])):
         line = sectdict["lines"][i]
         j = sectdict["line_nos"][i]
         if not line:
             continue
         try:
-            values = read_line(line)
+            values, spans = read_header_line(line)
         except:
             message = 'line {} (section {}): "{}"'.format(
                 # traceback.format_exc().splitlines()[-1].strip('\n'),
@@ -457,6 +475,13 @@ def parse_header_section(sectdict, version, ignore_header_errors=False):
             else:
                 raise exceptions.LASHeaderError(message)
         else:
+            if not spans['value'][1] is None:
+                cpos = spans['value'][1] + 1
+                cposarr.append(cpos)
+                if line.count(':') > 1 and abs(cpos - np.mean(cposarr)) > np.std(cposarr):
+                    # need to re-do the value:descr detection
+                    logger.info('colon pick error value="{value}" descr="{descr}"\n\t{}'.format(
+                        line, **values))
             section.append(parser(**values))
     return section
 
@@ -490,11 +515,10 @@ class SectionParser(object):
             self.func = self.metadata
             self.section_name2 = "Version"
 
-
         self.version = version
         self.section_name = title
 
-        defs = defaults.ORDER_DEFINITIONS
+        defs = defaults.ORDER_DEFINITIONS.copy()
         section_orders = defs[self.version][self.section_name2]
         self.default_order = section_orders[0]#
         self.orders = {}
@@ -629,22 +653,25 @@ def read_header_line(line, pattern=None):
         containing a string as value.
 
     '''
-    d = {'name': '', 'unit': '', 'value': '', 'descr': ''}
+    values = {'name': '', 'unit': '', 'value': '', 'descr': ''}
+    spans = {key: (None, None) for key in values.keys()}
     if pattern is None:
         if not ':' in line:
-            pattern = (r'\.?(?P<name>[^.]*)\.' +
-                       r'(?P<unit>[^\s:]*)' +
-                       r'(?P<value>[^:]*)')
+            if '.' in line:
+                if not ' ' in line.split('.', 1)[1]:
+                    pattern = '(?P<name>.*?)\.(?P<unit>.*)'
+            if pattern is None:
+                pattern = '(?P<name>.*?)\.(?P<unit>.*?) (?P<value>.*)'
         else:
-            pattern = (r'\.?(?P<name>[^.]*)\.' +
-                       r'(?P<unit>[^\s:]*)' +
-                       r'(?P<value>[^:]*):' +
-                       r'(?P<descr>.*)')
-    m = re.match(pattern, line)
-    mdict = m.groupdict()
-    for key, value in mdict.items():
-        d[key] = value.strip()
+            pattern = '(?P<name>.*?)\.(?P<unit>.*)(?P<value> ?.*):(?P<descr>.*)'
+    logger.debug('using pattern {}'.format(pattern))
+    match = re.match(pattern, line)
+    matchdict = match.groupdict()
+    for key, value in matchdict.items():
+        values[key] = value.strip()
         if key == 'unit':
-            if d[key].endswith('.'):
-                d[key] = d[key].strip('.')  # see issue #36
-    return d
+            if values[key].endswith('.'):
+                values[key] = values[key].strip('.')  # see issue #36
+        spans[key] = match.span(key)
+    # logger.debug('values={}'.format(values))
+    return values, spans
